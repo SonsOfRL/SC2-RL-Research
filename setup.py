@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     # Metadata
-    name="GymColab",
+    name="SC2-RL-Research",
     version=0.1,
     author="Kubilay Kagan Komurcu, Batuhan Ince, Tolga Ok",
     author_email="sonsofreinforcementlearning@gmail.com",
@@ -12,6 +12,6 @@ setup(
     license="MIT",
 
     # Package info
-    packages=["sc2-rl", ],
+    packages=["sc2_rl", ],
     zip_safe=False
 )

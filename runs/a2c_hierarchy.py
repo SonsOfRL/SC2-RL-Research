@@ -1,16 +1,12 @@
-import numpy as np
 import torch
-import gym
+import numpy as np
 import argparse
 from stable_baselines3.a2c import A2C
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common import logger
 
 from sc2_rl.envs.minier import MinierEnv
 from sc2_rl.policies.dense import Policy
-from sc2_rl.loggers.base import LogParametersCallback
-from sc2_rl.utils.wrappers import RepeatAction
 
 
 def run(args):
@@ -19,12 +15,13 @@ def run(args):
         seed = np.random.randint(0, 2**20)
 
     vecenv=make_vec_env(
-        env_id=lambda: RepeatAction(MinierEnv(), 1, no_op=0),
+        env_id=MinierEnv,
         n_envs=args.n_envs,
         seed=seed,
         vec_env_cls=SubprocVecEnv)
-
-    parameter_logger = LogParametersCallback()
+    
+    miner_policy = torch.load("path")
+    military_policy = torch.load("path")
 
     model = A2C(
         policy=Policy,
@@ -37,7 +34,14 @@ def run(args):
         vf_coef=args.val_coef,
         max_grad_norm=args.max_grad_norm,
         tensorboard_log=args.log_dir,
-        policy_kwargs={},
+        policy_kwargs=dict(
+            miner_policy=OptimalMiner(),
+            miner_observation_indices,
+            miner_action_indices,
+            military_policy=OptimalMilitary(),
+            military_observation_indices,
+            military_action_indices,
+        ),
         verbose=1,
         seed=seed,
         device=args.device,
@@ -46,8 +50,7 @@ def run(args):
     model.learn(
         args.total_timesteps,
         tb_log_name="SC2-minigame",
-        log_interval=args.log_interval,
-        callback=parameter_logger
+        log_interval=args.log_interval
     )
 
 
@@ -61,9 +64,9 @@ if __name__ == "__main__":
                         help="Torch device")
     parser.add_argument("--hiddensize", type=int, default=128,
                         help="Hidden size of the policy")
-    parser.add_argument("--n-steps", type=int, default=20,
+    parser.add_argument("--n-steps", type=int, default=5,
                         help="Rollout Length")
-    parser.add_argument("--gae-lambda", type=float, default=0.95,
+    parser.add_argument("--gae-lambda", type=float, default=0.9,
                         help="GAE coefficient")
     parser.add_argument("--lr", type=float, default=1e-4,
                         help="Learning rate")

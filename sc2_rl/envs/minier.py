@@ -3,11 +3,10 @@ from pysc2.lib import actions, features, units
 from gym import spaces
 import logging
 import numpy as np
-from base_env import SC2Env
 import random
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 
-logger = logging.getLogger(__name__)
+from sc2_rl.envs.base_env import SC2Env
 
 
 class MinierEnv(SC2Env):

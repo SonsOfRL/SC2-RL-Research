@@ -1,4 +1,4 @@
-
+import numpy as np
 import torch
 import gym
 from functools import partial
@@ -8,16 +8,21 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.policies import ActorCriticCnnPolicy
 
 
-class Policy(torch.nn.Module):
+class HierarchicalPolicy(torch.nn.Module):
 
     def __init__(self,
                  observation_space,
                  action_space,
                  lr_schedule,
                  use_sde,
+                 miner_policy,
+                 miner_observation_indices,
+                 miner_action_indices,
+                 military_policy,
+                 military_observation_indices,
+                 military_action_indices,
                  hidden_size=128,
-                 ortho_init=True,
-                 **kwargs):
+                 ortho_init=True):
         super().__init__()
         self.observation_space = observation_space
         self.action_space = action_space
@@ -58,6 +63,11 @@ class Policy(torch.nn.Module):
         act_dist = torch.distributions.Categorical(logits=act_logits)
         action = act_dist.sample()
         log_prob = act_dist.log_prob(action)
+
+        miner_actions = miner_policy(observations[miner_observation_indices])
+        military_actions = military_policy(observations[military_observation_indices])
+        actions = miner_actions_indices[miner_actions] * action + (1 - action) * military_actions_indices[military_actions]
+
         return action, value, log_prob
 
     def _forward(self, observation):
