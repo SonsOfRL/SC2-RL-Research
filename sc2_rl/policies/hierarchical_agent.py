@@ -1,32 +1,40 @@
 import numpy as np
 import torch
 import gym
-from functools import partial
+from typing import Dict, NamedTuple, List
+from functools import partial, chain 
 from stable_baselines3.a2c import A2C
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.policies import ActorCriticCnnPolicy
 
 
+class CoreSkillTuple(NamedTuple):
+    policy: torch.nn.Module
+    observation_indices: torch.Tensor
+    action_map: torch.Tensor
+    action_indices: List[int]
+    optimizer: torch.optim.Optimizer
+    
+
+
 class HierarchicalPolicy(torch.nn.Module):
 
     def __init__(self,
-                 observation_space,
-                 action_space,
-                 lr_schedule,
-                 use_sde,
-                 miner_policy,
-                 miner_observation_indices,
-                 miner_action_indices,
-                 military_policy,
-                 military_observation_indices,
-                 military_action_indices,
-                 hidden_size=128,
-                 ortho_init=True):
+                 observation_space: gym.spaces,
+                 action_space: gym.spaces,
+                 lr_schedule: float,
+                 use_sde: bool,
+                 core_policy_tuple: List[CoreSkillTuple],
+                 hidden_size: int = 128,
+                 ortho_init: bool = True):
         super().__init__()
         self.observation_space = observation_space
-        self.action_space = action_space
+        # self.action_space = action_space
         self.lr_schedule = lr_schedule
+        self.core_policy_tuple = core_policy_tuple
+
+        self.n_cores = len(self.core_policy_tuple)
         
         self.action_features = torch.nn.Sequential(
             torch.nn.Linear(observation_space.shape[0], hidden_size),
@@ -34,7 +42,7 @@ class HierarchicalPolicy(torch.nn.Module):
             torch.nn.Linear(hidden_size, hidden_size),
             torch.nn.ReLU(),)
         self.action_layer = torch.nn.Sequential(
-            torch.nn.Linear(hidden_size, action_space.n),
+            torch.nn.Linear(hidden_size, self.n_cores),
         )
         self.value_features = torch.nn.Sequential(
             torch.nn.Linear(observation_space.shape[0], hidden_size),
@@ -64,11 +72,11 @@ class HierarchicalPolicy(torch.nn.Module):
         action = act_dist.sample()
         log_prob = act_dist.log_prob(action)
 
-        miner_actions = miner_policy(observations[miner_observation_indices])
-        military_actions = military_policy(observations[military_observation_indices])
-        actions = miner_actions_indices[miner_actions] * action + (1 - action) * military_actions_indices[military_actions]
-
-        return action, value, log_prob
+        core_actions = chain([core_policy.action_map[core_policy.policy(observation[core_policy.observation_indices])]
+                        for core_policy in self.core_policy_tuple])
+        actions = [*core_actions, action]
+        
+        return actions, value, log_prob
 
     def _forward(self, observation):
         val_feature = self.value_features(observation)
